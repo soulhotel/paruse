@@ -62,3 +62,5 @@ Or any of these other helpful options listed below.
 https://github.com/user-attachments/assets/75dc1103-c565-453e-88fd-f91cc020745e
 
 > And another [video demonstration](https://www.youtube.com/watch?v=wn6xwm3MdTU) of Paruse 0.5 (on youtube).
+
+###### K.I.S.S.
