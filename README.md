@@ -42,7 +42,7 @@ Or any of these other helpful options listed below.
     -rs -restore  → Restore from backup
     -b  -backup   → Backup package list
     -n  -news     → Fetch Arch news
-    -h  -help      -> Help
+    -h  -help     → Help
 ```
 
 ## Preview
