@@ -12,7 +12,7 @@ Paruse uses [paru](https://github.com/Morganamilo/paru) & [fzf](https://github.c
 
 > As of 0.5: When browsing/hovering an aur package, its pkgbuild and source tree are displayed along side package details.
 
-## Install
+## Installion
 
 ```
 paru -S paruse
@@ -20,7 +20,30 @@ paru -S paruse
 ```
 git clone https://github.com/soulhotel/paruse.git
 ```
-> To summon paruse, type `paruse` in a terminal or launch it via your favorite app launcher. Git installations can use the .desktop file provided in 📂 `paruse/pkg/`
+> To summon paruse, type `paruse` in a terminal or launch it via your favorite app launcher. Git installations can also use the .desktop file provided in 📂 `paruse/pkg/`
+
+## Flags
+
+You can skip the main menu interaction by using flags. Try typing:
+```
+paruse -news
+```
+
+Or any of these other helpful options listed below.
+```
+    -v  -view     → View package list
+    -a  -add      → Add/browse packages
+    -r  -rem      → Remove package
+    -p  -purge    → Purge package
+    -u  -up       → Update system
+    -d  -data     → Package stats
+    -c  -cache    → Clean cache
+    -s  -sync     → Sync package list
+    -rs -restore  → Restore from backup
+    -b  -backup   → Backup package list
+    -n  -news     → Fetch Arch news
+    -h  -help      -> Help
+```
 
 ## Preview
 
@@ -41,5 +64,3 @@ git clone https://github.com/soulhotel/paruse.git
 <img src="https://github.com/user-attachments/assets/6f73d3ac-bef4-4f00-ba0a-e0f234756cad" width="90%"/>
 
 > See a [video demonstration](https://www.youtube.com/watch?v=wn6xwm3MdTU) (on youtube).
-
-![Alt](https://repobeats.axiom.co/api/embed/306c2676dea1251899cdbc25b5b154add696a846.svg "Repobeats analytics image")
