@@ -18,7 +18,7 @@
     -rs -restore  → Restore from backup
     -b  -backup   → Backup package list
     -n  -news     → Fetch Arch news
-    -h  -help      -> Help
+    -h  -help     → Help
 ```
 
 ## <ins> 0.5 </ins>
