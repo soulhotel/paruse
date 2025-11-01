@@ -72,16 +72,14 @@ options=(
     "14 • Set a custom bash_alias for Paruse"
     "q • Quit"
 )
-pstate="
-Paruse: Package Management for packages that you just cant live without
+pstate="Paruse: Arch Package Management; powered by paru and fzf.
+
 View Mode: ${blueish}${viewmode}${nocolor}
 Review Mode: ${blueish}${reviewmode}${nocolor}
 "
-ucheck="
-Pacman updates available: ${blueish}${pacupdate}${nocolor}
+ucheck="Pacman updates available: ${blueish}${pacupdate}${nocolor}
 Aur updates available: ${blueish}${aurupdate}${nocolor}
 "
-placeholder="What other info would you like to see present in the paruse main menu? Pitch your ideas as an issue on ${blueish}https://github.com/soulhotel/paruse${nocolor}, anything ideas that can blend in well with light and basic operations can be implemented."
 help="
 1 • View package list
     Presents a list of explicitly installed packages on this system using:
@@ -156,9 +154,10 @@ main_menu() {
         --ansi \
         --layout=reverse \
         --prompt="Paruse › " \
+        --header="ESC to exit. Dbl-click or Type to begin." \
         --height=95% \
-        --preview-window=right:70%:wrap \
-        --preview="echo -e '$pstate\n$ucheck\n\n$placeholder\n$help'"
+        --preview-window=right:65%:wrap \
+        --preview="echo -e '$pstate\n$ucheck\n$help'"
         )
 
     case "$choice" in
@@ -249,7 +248,7 @@ view_package_list() {
 }
 preview_pkg() {
     local pkg="$1"
-    pkg="${pkg// (installed)/}"  # remove " (installed)" suffix if present
+    pkg="$(echo "$pkg" | sed -r 's/\x1B\[[0-9;]*m//g' | sed 's/ (installed)$//')"
 
     if paru -Si "$pkg" 2>/dev/null | grep -iE "^Repository\s*:\s*aur"; then
         paru -Si "$pkg"
@@ -281,19 +280,22 @@ add_package() {
     echo -e "\n • Loading Repo(s)..."
     parusing="$config_dir/parusing"
     comm -23 <(paru -Slq | sort) <(paru -Qq | sort) | sed 's/$//' > "$parusing"
-    comm -12 <(paru -Slq | sort) <(paru -Qq | sort) | sed 's/$/ (installed)/' >> "$parusing"
+    comm -12 <(paru -Slq | sort) <(paru -Qq | sort) | sed $'s/$/ \e[38;2;131;170;208m(installed)\e[0m/' >> "$parusing"
     sort "$parusing" -o "$parusing"
 
     fzf_output=$(fzf \
+        --ansi \
         --print-query \
         --preview='bash -c "preview_pkg {}"' \
         --layout=reverse \
-        --prompt="Enter/DBL-Click a package to add: " \
-        --preview-window=wrap:50% \
+        --prompt="Paruse › " \
+        --header="ESC to exit. Dbl-click or Enter package(s) to add." \
+        --preview-window=wrap:65% \
         < "$parusing")
 
     query=$(echo "$fzf_output" | head -n1)
-    selection=$(echo "$fzf_output" | sed -n '2p' | sed 's/ (installed)//')
+    selection=$(echo "$fzf_output" | sed -n '2p' | sed -r 's/\x1B\[[0-9;]*m//g' | sed 's/ (installed)$//')
+
 
     if [[ -n "$selection" ]]; then
         pkg_input="$selection"
@@ -302,12 +304,12 @@ add_package() {
     fi
     if [[ -z "$pkg_input" ]]; then
         echo -e "\n • No package name entered."
-        sleep 2
+        sleep 1
     else
         for pkg in $pkg_input; do
             if grep -Fxq "$pkg" "$packagelist"; then
                 echo " • Package '$pkg' is already in the list."
-                sleep 1
+                sleep 2
             else
                 echo -e "\n • '$pkg' marked for installation...\n"
                 case "$reviewmode" in
@@ -341,7 +343,8 @@ remove_package() {
     pkg_to_remove=$(fzf --print-query \
         --preview='pacman -Qil {}' \
         --layout=reverse \
-        --prompt="ESC to exit | Select Package(s) to remove: " \
+        --prompt="Paruse › " \
+        --header="ESC to exit. Dbl-click or Enter package(s) to remove." \
         --preview-window=wrap:50% \
         < "$packagelist")
     typed_input=$(echo "$pkg_to_remove" | head -n1)
@@ -405,7 +408,8 @@ purge_package() {
     pkg_to_remove=$(fzf --print-query \
         --preview='pacman -Qil {}' \
         --layout=reverse \
-        --prompt="ESC to exit | Select Package(s) to purge: " \
+        --prompt="Paruse › " \
+        --header="ESC to exit. Dbl-click or Enter package(s) to purge." \
         --preview-window=wrap:50% \
         < "$packagelist")
     typed_input=$(echo "$pkg_to_remove" | head -n1)
@@ -474,16 +478,15 @@ install_list() {
     fi
     preview_text=$(
         cat <<EOF
+Selecting a packagelist here will attempt to install (if not already installed) all packages listed inside the file.
+This can be used as an assistant to clone package list on different systems.
+
 Paruse stores your currently installed packagelist in:
 ${yellowish}${HOME}/.config/paruse${nocolor}
 
-Any backups made via:
-${yellowish}Backup current package list${nocolor}
-Are stored as:
-${yellowish}packagelist-DateAndTime${nocolor}
+Your backed up list are also stored there as:
+${yellowish}my_package_list-DateAndTime${nocolor}
 
-Selecting a packagelist here will attempt to install (if not already installed)
-all packages listed inside the file.
 EOF
     )
     selected_file=$(printf "%s\n" "${packagelists[@]}" | \
@@ -526,8 +529,9 @@ backup_package_list() {
 }
 fetch_news() {
     clear
-    echo -e "\n • Fetching Arch Linux News..."
+    echo -e "\n • Fetching Arch Linux News...\n"
     paru -Pw
+    echo
     read -rp " • Press Enter to continue..."
 }
 sync_package_list() {
@@ -540,6 +544,53 @@ sync_package_list() {
     paru -Qqe | sort > "$packagelist"
     sleep 2
 }
+
+# skip main menu via flags ////////////////////////////////////////////////////////////////////////////
+
+if [[ -n "$1" ]]; then
+    case "$1" in
+        -v|-view) view_package_list ;;
+        -a|-add) add_package;;
+        -r|-rem) remove_package;;
+        -p|-purge) purge_package;;
+        -u|-up) paru -Syu; read -rp " • Press Enter to continue...";;
+        -d|-data) paru -Ps; read -rp " • Press Enter to continue...";;
+        -c|-cache) paru -Scc; read -rp " • Press Enter to continue...";;
+        -s|-sync) sync_package_list;;
+        -rs|-restore) install_list;;
+        -b|-backup) backup_package_list;;
+        -n|-news) fetch_news;;
+        -h|--help)
+            cat <<'EOF'
+
+You can skip the main menu and jump straight into action using flags. Try typing:
+
+paruse -news
+
+Or any of these other options listed below.
+
+  -v  -view     → View package list
+  -a  -add      → Add/browse packages
+  -r  -rem      → Remove package
+  -p  -purge    → Purge package
+  -u  -up       → Update system
+  -d  -data     → Total package data briefing
+  -c  -cache    → Clean cache
+  -s  -sync     → Sync package list
+  -rs -restore  → Restore from backup
+  -b  -backup   → Backup package list
+  -n  -news     → Fetch Arch news
+
+For any other issue please report to the github: https://github.com/soulhotel/paruse
+
+EOF
+            exit 0
+            ;;
+        *) echo "Unknown flag: $1"; exit 1 ;;
+    esac
+fi
+
+# while true do do do  ///////////////////////////////////////////////////////////////////////////////
 
 while true; do
     clear
