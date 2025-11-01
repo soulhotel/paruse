@@ -47,20 +47,18 @@ Or any of these other helpful options listed below.
 
 ## Preview
 
-> Browsing Installed Packages
+> Browsing Installed Packages | Managing packagelist backups
 
-<img src="https://github.com/user-attachments/assets/bdc6f812-faa4-4c1e-a339-8c940311e13c" width="90%"/>
+<img src="https://github.com/user-attachments/assets/bdc6f812-faa4-4c1e-a339-8c940311e13c" width="49%"/>
+<img src="https://github.com/user-attachments/assets/6f73d3ac-bef4-4f00-ba0a-e0f234756cad" width="49%"/>
 
-> Browsing Arch/Aur Repo's
+> Browsing Arch/Aur Repo's | Installing multiple (batch) packages
 
-<img src="https://github.com/user-attachments/assets/6ba5d42e-1a2d-49c0-a566-7837d6cbdba3" width="90%"/>
+<img src="https://github.com/user-attachments/assets/6ba5d42e-1a2d-49c0-a566-7837d6cbdba3" width="49%"/>
+<img src="https://github.com/user-attachments/assets/7d91bfd8-6d11-4fb5-92c6-1138bb1ce8f1" width="49%"/>
 
-> Installing multiple packages
+> Paruse 0.6+ Demo | Browsing, flags, mouse or keyboard, etc.
 
-<img src="https://github.com/user-attachments/assets/7d91bfd8-6d11-4fb5-92c6-1138bb1ce8f1" width="90%"/>
+https://github.com/user-attachments/assets/75dc1103-c565-453e-88fd-f91cc020745e
 
-> Managing packagelist backups
-
-<img src="https://github.com/user-attachments/assets/6f73d3ac-bef4-4f00-ba0a-e0f234756cad" width="90%"/>
-
-> See a [video demonstration](https://www.youtube.com/watch?v=wn6xwm3MdTU) (on youtube).
+> And another [video demonstration](https://www.youtube.com/watch?v=wn6xwm3MdTU) of Paruse 0.5 (on youtube).
