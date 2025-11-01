@@ -12,7 +12,7 @@ Paruse uses [paru](https://github.com/Morganamilo/paru) & [fzf](https://github.c
 
 > As of 0.5: When browsing/hovering an aur package, its pkgbuild and source tree are displayed along side package details.
 
-## Installion
+## Installation
 
 ```
 paru -S paruse
