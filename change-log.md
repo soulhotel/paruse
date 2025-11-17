@@ -1,3 +1,11 @@
+## <ins> 0.7 </ins>
+
+- The aur PKGBUILD is fixed to no longer assume paruse needs an update based on latest git commit. Sorry about that.
+- New `View Install History` option will list your last 100 installed/uninstalled package activity, sorted by date and time.
+- The `View Install History` option has new flags (`paruse -i`|`paruse -history`) to skip Main Menu launch.
+- The `Fetch Arch News` option (paru -Pw) could sometimes take 10-15 seconds just to return a server error (if arch servers are down). This is now handled more gracefully, by limiting the command to a 3 second response time. While also pinging & displaying both arch and aur sites server status.
+- The `Fetch Arch News` option now *also* fetches recent headlines from https://www.phoronix.com/linux/Arch+Linux, a straight-forward and informative news source.
+
 ## <ins> 0.6 </ins>
 
 - while browsing repositories, the `(installed)` label for already installed packages is now more obvious (colored)

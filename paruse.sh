@@ -42,7 +42,7 @@ if [[ ! -s "$packagelist" ]]; then
     paru -Qqe | sort > "$packagelist"
     sleep 4
 fi
-blueish="\e[38;2;131;170;208m"; yellowish="\e[38;2;175;175;135m"; nocolor="\e[0m"
+blueish="\e[38;2;131;170;208m"; yellowish="\e[38;2;175;175;135m"; red="\033[1;31m"; green="\033[1;32m"; nocolor="\e[0m"
 
 # main menu ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,8 +68,9 @@ options=(
     "11 • Restore full package list"
     "12 • Backup current package list"
     "•"
-    "13 • Fetch Arch Linux News"
-    "14 • Set a custom bash_alias for Paruse"
+    "13 • View Install History"
+    "14 • Fetch Arch Linux News"
+    "15 • Set a custom bash_alias for Paruse"
     "q • Quit"
 )
 pstate="Paruse: Arch Package Management; powered by paru and fzf.
@@ -137,11 +138,14 @@ help="
     ${yellowish}\$packagelist.backups/\$(date +%F_%H-%M-%S)${nocolor}
     This points to ${HOME}/.config/paruse/
 
-13 • Fetch Arch Linux News
+13 • View Install History
+    List of last 200 installed and uninstalled package activity/history, sorted by most recent date.
+
+14 • Fetch Arch Linux News
     Fetches Arch Linux News via:
     ${yellowish}paru -Pw${nocolor}
 
-14 • Set custom bash_alias for Paruse
+15 • Set custom bash_alias for Paruse
     Allows you to set an alias (e.g., ${yellowish}paruse${nocolor}) for quick access to this tool from your shell config.
     This function is primary for use if Paruse was obtained through git. Although still useful for making more shortcuts.
 "
@@ -173,8 +177,9 @@ main_menu() {
         "10 • Sync current package list") sync_package_list ;;
         "11 • Restore full package list") install_list ;;
         "12 • Backup current package list") backup_package_list ;;
-        "13 • Fetch Arch Linux News") fetch_news ;;
-        "14 • Set a custom bash_alias for Paruse") set_alias ;;
+        "13 • View Install History") view_install_history ;;
+        "14 • Fetch Arch Linux News") fetch_news ;;
+        "15 • Set a custom bash_alias for Paruse") set_alias ;;
         "q • Quit"|"") echo "Cya!"; exit ;;
     esac
 }
@@ -529,8 +534,50 @@ backup_package_list() {
 }
 fetch_news() {
     clear
-    echo -e "\n • Fetching Arch Linux News...\n"
-    paru -Pw
+    echo -e "\n${blueish} • Server Status:${nocolor} https://status.archlinux.org/\n"
+    if ! ping -c 1 -W 2 archlinux.org >/dev/null 2>&1; then
+        echo "[Skipped 3s] 🟠 Arch might be down.."
+    else
+        echo "[Operating]  🟢 Arch seems operational.."
+    fi
+    if ! ping -c 1 -W 2 aur.archlinux.org >/dev/null 2>&1; then
+        echo "[Skipped 3s] 🟠 AUR might be down.."
+    else
+        echo "[Operating]  🟢 AUR seems operational.."
+    fi
+    echo -e "\n${blueish} • News:${nocolor} https://www.phoronix.com/linux/Arch+Linux\n"
+    curl -s https://www.phoronix.com/linux/Arch+Linux \
+    | awk '
+    function pad2(n) { return (n < 10 ? "0" n : n) }
+
+    /<article>/ { in_article=1; title=""; date="" }
+    in_article {
+        if ($0 ~ /<header>/) { in_header=1 }
+        if (in_header) {
+        if (match($0, /<header><a[^>]*>([^<]+)<\/a>/, t)) { title=t[1] }
+        if ($0 ~ /<\/header>/) { in_header=0 }
+        }
+        if ($0 ~ /<div class="details">/) {
+        if (match($0, /([0-9]+) ([A-Za-z]+) ([0-9]+)/, d)) {
+            day = pad2(d[1])
+            month = d[2]
+            year = d[3]
+            months["January"]="01"; months["February"]="02"; months["March"]="03"; months["April"]="04";
+            months["May"]="05"; months["June"]="06"; months["July"]="07"; months["August"]="08";
+            months["September"]="09"; months["October"]="10"; months["November"]="11"; months["December"]="12";
+            month_num = months[month]
+            printf "[%s %s %s] %s\n", year, month_num, day, title
+            in_article=0
+        }
+        }
+    }
+    ' | head -n 4 | tac
+    echo -e "\n${blueish} • News:${nocolor} https://archlinux.org/feeds/news/\n"
+    if ! output=$(timeout 3 paru -Pw 2>/dev/null); then
+        echo "[Skipped 3s] 🟠 Arch might be down.."
+    else
+        echo "$output"
+    fi
     echo
     read -rp " • Press Enter to continue..."
 }
@@ -543,6 +590,27 @@ sync_package_list() {
     fi
     paru -Qqe | sort > "$packagelist"
     sleep 2
+}
+view_install_history() {
+    RESET='\033[0m'
+    grep -h '^\[.*\] \[ALPM\] \(installed\|removed\) ' /var/log/pacman.log* 2>/dev/null | \
+    tail -1000 | \
+    sort | \
+    sed -E 's/^\[([^T]+)T([^-]+)-[0-9:+]+\].* (installed|removed) ([^ ]+) \(([^)]+)\).*/\1 \2 \3 \4 (\5)/' | \
+    awk -v green="$green" -v red="$red" -v reset="$RESET" '{
+        cmd = "date -d \"" $2 "\" +\"%I:%M %p\" 2>/dev/null";
+        cmd | getline t; close(cmd);
+        if (t == "") t = substr($2, 1, 5);
+        split(t, a, ":");
+        hour = a[1]; minute = a[2]; ampm = tolower(a[3]);
+        if (hour == "00") hour = "12";
+        indicator = ($3 == "installed") ? green "[+]" reset : red "[-]" reset;
+        printf "[%s %02d:%s%s] %s %s\n", $1, hour+0, minute, ampm, indicator, $4 " " $5
+    }' | \
+    grep -Fwf <(pacman -Qei | awk '/^Name/{name=$3} /^Install Reason/{if($4=="Explicitly") print name}') | \
+    tail -200
+    echo
+    read -rp " • Press Enter to continue..."
 }
 
 # skip main menu via flags ////////////////////////////////////////////////////////////////////////////
@@ -560,6 +628,7 @@ if [[ -n "$1" ]]; then
         -rs|-restore) install_list;;
         -b|-backup) backup_package_list;;
         -n|-news) fetch_news;;
+        -i|-history) view_install_history;;
         -h|--help)
             cat <<'EOF'
 
@@ -573,6 +642,7 @@ Or any of these other options listed below.
   -a  -add      → Add/browse packages
   -r  -rem      → Remove package
   -p  -purge    → Purge package
+  -i  -history  → View install and uninstall history
   -u  -up       → Update system
   -d  -data     → Total package data briefing
   -c  -cache    → Clean cache
@@ -581,7 +651,7 @@ Or any of these other options listed below.
   -b  -backup   → Backup package list
   -n  -news     → Fetch Arch news
 
-For any other issue please report to the github: https://github.com/soulhotel/paruse
+Have an issue? Please report it to the github: https://github.com/soulhotel/paruse
 
 EOF
             exit 0
