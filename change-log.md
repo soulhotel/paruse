@@ -1,3 +1,8 @@
+## <ins> 0.8 </ins>
+
+- New `Rebuild Package` option, for scenarios where an installed package needs to be rebuilt (cleanbuild).
+- New `Toggle Aur Helper/Tool` option, for now, this simply toggles between `paru` or `yay` as the aur operator.
+
 ## <ins> 0.7 </ins>
 
 - The aur PKGBUILD is fixed to no longer assume paruse needs an update based on latest git commit. Sorry about that.

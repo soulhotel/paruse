@@ -10,6 +10,7 @@ if [ -z "$BASH_VERSION" ]; then
     exec /bin/bash "$0" "$@"
 fi
 
+
 # dependency check ////////////////////////////////////////////////////////////////////////////////////
 
 for dep in paru fzf; do
@@ -19,6 +20,7 @@ for dep in paru fzf; do
     fi
 done
 
+
 # setup environment //////////////////////////////////////////////////////////////////////////////////
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,9 +28,13 @@ config_dir="$HOME/.config/paruse"
 packagelist="$config_dir/my_package_list"
 viewmode="All"
 reviewmode="Review Changes"
+aurtool="yay"
+export aurtool
+blueish="\e[38;2;131;170;208m"; yellowish="\e[38;2;175;175;135m"; red="\033[1;31m"; green="\033[1;32m"; nocolor="\e[0m"
+
 (
-    echo "$(checkupdates | wc -l)" > /tmp/paruse_pacupdates # i learned some new background tech
-    echo "$(paru -Qua | wc -l)" > /tmp/paruse_aurupdates
+    echo "$(checkupdates | wc -l)" > /tmp/paruse_pacupdates
+    echo "$($aurtool -Qua | wc -l)" > /tmp/paruse_aurupdates
 ) &
 pacupdate=$(cat /tmp/paruse_pacupdates 2>/dev/null || echo "?")
 aurupdate=$(cat /tmp/paruse_aurupdates 2>/dev/null || echo "?")
@@ -39,17 +45,12 @@ if [[ ! -d "$config_dir" ]]; then
 fi
 if [[ ! -s "$packagelist" ]]; then
     echo " • • • packagelist is empty or missing. Populating with installed packages..."
-    paru -Qqe | sort > "$packagelist"
+    $aurtool -Qqe | sort > "$packagelist"
     sleep 4
 fi
-blueish="\e[38;2;131;170;208m"; yellowish="\e[38;2;175;175;135m"; red="\033[1;31m"; green="\033[1;32m"; nocolor="\e[0m"
 
-# main menu ///////////////////////////////////////////////////////////////////////////////////////////
 
-# I could technically use a live preview pane for fzf,
-# and manage/manipulate the initial right pane info via a dedicated file,
-# but this is the approach i first started with...
-# doing it all in-script like this:
+# main menu //////////////////////////////////////////////////////////////////////////////////////////
 
 options=(
     "1 • View package list"
@@ -71,12 +72,18 @@ options=(
     "13 • View Install History"
     "14 • Fetch Arch Linux News"
     "15 • Set a custom bash_alias for Paruse"
+    "•"
+    "16 • Rebuild a Package"
+    "•"
+    "17 • Toggle Aur Helper/Tool"
+    "•"
     "q • Quit"
 )
 pstate="Paruse: Arch Package Management; powered by paru and fzf.
 
 View Mode: ${blueish}${viewmode}${nocolor}
 Review Mode: ${blueish}${reviewmode}${nocolor}
+Aur Tool: ${blueish}${aurtool}${nocolor}
 "
 ucheck="Pacman updates available: ${blueish}${pacupdate}${nocolor}
 Aur updates available: ${blueish}${aurupdate}${nocolor}
@@ -148,9 +155,16 @@ help="
 15 • Set custom bash_alias for Paruse
     Allows you to set an alias (e.g., ${yellowish}paruse${nocolor}) for quick access to this tool from your shell config.
     This function is primary for use if Paruse was obtained through git. Although still useful for making more shortcuts.
+
+16 • Rebuild a Package
+    For scenarios where you may need to reinstall and rebuild a package, this is handled by passing a package into:
+    ${yellowish}paru -R package && paru -S package --rebuild${nocolor}
+
+17 • Toggle Aur Helper/Tool
+    Toggle Aur Helper from paru to yay
 "
 
-# interactive process //////////////////////////////////////////////////////////////////////////////////
+# interactive process ////////////////////////////////////////////////////////////////////////////////
 
 main_menu() {
     local choice
@@ -171,32 +185,31 @@ main_menu() {
         "4 • Purge package") purge_package ;;
         "5 • Toggle view mode") toggle_view_mode ;;
         "6 • Toggle review mode") toggle_review_mode ;;
-        "7 • Update system") paru -Syu && read -rp " • Press Enter to continue..." ;;
-        "8 • Package data briefing") paru -Ps && read -rp " • Press Enter to continue..." ;;
-        "9 • Package cache cleaning") paru -Scc && read -rp " • Press Enter to continue..." ;;
+        "7 • Update system") $aurtool -Syu && read -rp " • Press Enter to continue..." ;;
+        "8 • Package data briefing") $aurtool -Ps && read -rp " • Press Enter to continue..." ;;
+        "9 • Package cache cleaning") $aurtool -Scc && read -rp " • Press Enter to continue..." ;;
         "10 • Sync current package list") sync_package_list ;;
         "11 • Restore full package list") install_list ;;
         "12 • Backup current package list") backup_package_list ;;
         "13 • View Install History") view_install_history ;;
         "14 • Fetch Arch Linux News") fetch_news ;;
         "15 • Set a custom bash_alias for Paruse") set_alias ;;
+        "16 • Rebuild a Package") rebuild_package ;;
+        "17 • Toggle Aur Helper/Tool") toggle_aur_tool ;;
         "q • Quit"|"") echo "Cya!"; exit ;;
     esac
 }
 
-# assign functionality //////////////////////////////////////////////////////////////////////////////////
+
+# assign functionality ///////////////////////////////////////////////////////////////////////////////
+
+# whenever i decide to modularize this project, these toggles/helpers will serve as the obvious configuration
 
 toggle_view_mode() {
     case $viewmode in
-        "All")
-            viewmode="Only AUR"
-            ;;
-        "Only AUR")
-            viewmode="No AUR"
-            ;;
-        "No AUR" | *)
-            viewmode="All"
-            ;;
+        "All") viewmode="Only AUR" ;;
+        "Only AUR") viewmode="No AUR" ;;
+        "No AUR" | *) viewmode="All" ;;
     esac
     sed -i "0,/^viewmode=/s|^viewmode=.*|viewmode=\"$viewmode\"|" "$0"
     pstate="
@@ -207,15 +220,9 @@ Review Mode: ${blueish}${reviewmode}${nocolor}
 }
 toggle_review_mode() {
     case $reviewmode in
-        "Review Changes")
-            reviewmode="Skip Review"
-            ;;
-        "Skip Review")
-            reviewmode="Only Progress"
-            ;;
-        "Only Show Progress" | *)
-            reviewmode="Review Changes"
-            ;;
+        "Review Changes") reviewmode="Skip Review" ;;
+        "Skip Review") reviewmode="Only Show Progress" ;;
+        "Only Show Progress" | *) reviewmode="Review Changes" ;;
     esac
     sed -i "0,/^reviewmode=/s|^reviewmode=.*|reviewmode=\"$reviewmode\"|" "$0"
     pstate="
@@ -224,10 +231,42 @@ View Mode: ${blueish}${viewmode}${nocolor}
 Review Mode: ${blueish}${reviewmode}${nocolor}
 "
 }
+toggle_aur_tool() {
+    case $aurtool in
+        "paru") aurtool="yay" ;;
+        "yay") aurtool="paru" ;;
+    esac
+    sed -i "0,/^aurtool=/s|^aurtool=.*|aurtool=\"$aurtool\"|" "$0"
+    pstate="
+Paruse: Package Management for packages that you just cant live without
+View Mode: ${blueish}${viewmode}${nocolor}
+Review Mode: ${blueish}${reviewmode}${nocolor}
+Aur Tool: ${blueish}${aurtool}${nocolor}
+"
+}
+rebuild() {
+    if [[ "$aurtool" == "yay" ]]; then echo "--cleanbuild"
+    else echo "--rebuild"
+    fi
+}
+skipreview() {
+    if [[ "$aurtool" == "yay" ]]; then echo "--noreview"
+    else echo "--skipreview"
+    fi
+}
+quiet() {
+    if [[ "$aurtool" == "yay" ]]; then echo "--batchinstall"
+    else echo "--quiet"
+    fi
+}
+
+
+# assign functionality ///////////////////////////////////////////////////////////////////////////////
+
 view_package_list() {
     case $viewmode in
         "Only AUR")
-            mapfile -t aur_pkgs < <(paru -Qmq)
+            mapfile -t aur_pkgs < <($aurtool -Qmq)
             grep -Fx -f <(printf '%s\n' "${aur_pkgs[@]}") "$packagelist" | fzf \
                 --preview 'pacman -Qil {}' \
                 --layout=reverse \
@@ -235,7 +274,7 @@ view_package_list() {
                 --preview-window=wrap:70%
             ;;
         "No AUR")
-            mapfile -t aur_pkgs < <(paru -Qmq)
+            mapfile -t aur_pkgs < <($aurtool -Qmq)
             grep -Fxv -f <(printf '%s\n' "${aur_pkgs[@]}") "$packagelist" | fzf \
                 --preview 'pacman -Qil {}' \
                 --layout=reverse \
@@ -255,8 +294,8 @@ preview_pkg() {
     local pkg="$1"
     pkg="$(echo "$pkg" | sed -r 's/\x1B\[[0-9;]*m//g' | sed 's/ (installed)$//')"
 
-    if paru -Si "$pkg" 2>/dev/null | grep -iE "^Repository\s*:\s*aur"; then
-        paru -Si "$pkg"
+    if $aurtool -Si "$pkg" 2>/dev/null | grep -iE "^Repository\s*:\s*aur"; then
+        $aurtool -Si "$pkg"
         echo -e "\e[34mREMINDER:\e[0m
 This is a package from the AUR (Arch User Repository). While votes and popularity are metrics for AUR packages, they do not guarantee that a package is vetted or safe. Always double check the package by reviewing the package build, and any other file included such as setup and install scripts. Thank you.
 
@@ -268,7 +307,7 @@ https://aur.archlinux.org/packages/$pkg
 
         echo -e "\n\e[34mTREE:\e[0m"
         # temporarily I can display full source tree here, I can definitely curl the links in the tree like above,
-        # but ensure what impact that will have on the browsing experiences' speed, maybe a different display structure.
+        # but unsure what impact that will have on the browsing experiences' speed, maybe a different display structure.
         curl -fsSL "https://aur.archlinux.org/cgit/aur.git/tree/?h=$pkg" | \
         grep 'tree/' | \
         sed -n 's/.*tree\/\([^?"]*\).*/\1/p' | \
@@ -277,15 +316,15 @@ https://aur.archlinux.org/packages/$pkg
             echo "https://aur.archlinux.org/cgit/aur.git/plain/$file?h=$pkg"
         done
     else
-        paru -Si "$pkg"
+        $aurtool -Si "$pkg"
     fi
 }
 export -f preview_pkg
 add_package() {
     echo -e "\n • Loading Repo(s)..."
     parusing="$config_dir/parusing"
-    comm -23 <(paru -Slq | sort) <(paru -Qq | sort) | sed 's/$//' > "$parusing"
-    comm -12 <(paru -Slq | sort) <(paru -Qq | sort) | sed $'s/$/ \e[38;2;131;170;208m(installed)\e[0m/' >> "$parusing"
+    comm -23 <($aurtool -Slq | sort) <($aurtool -Qq | sort) | sed 's/$//' > "$parusing"
+    comm -12 <($aurtool -Slq | sort) <($aurtool -Qq | sort) | sed $'s/$/ \e[38;2;131;170;208m(installed)\e[0m/' >> "$parusing"
     sort "$parusing" -o "$parusing"
 
     fzf_output=$(fzf \
@@ -318,18 +357,10 @@ add_package() {
             else
                 echo -e "\n • '$pkg' marked for installation...\n"
                 case "$reviewmode" in
-                    "Review Changes")
-                        paru -S --needed "$pkg"
-                        ;;
-                    "Skip Review")
-                        paru -S --needed --skipreview --noconfirm "$pkg"
-                        ;;
-                    "Only Show Progress")
-                        paru -S --needed --quiet --noconfirm "$pkg"
-                        ;;
-                    *)
-                        paru -S --needed "$pkg"
-                        ;;
+                    "Review Changes") $aurtool -S --needed "$pkg" ;;
+                    "Skip Review") $aurtool -S --needed $(skipreview) --noconfirm "$pkg" ;;
+                    "Only Show Progress") $aurtool -S --needed $(quiet) --noconfirm "$pkg" ;;
+                    *) $aurtool -S --needed "$pkg";;
                 esac
                 if [[ $? -eq 0 ]]; then
                     echo "$pkg" >> "$packagelist"
@@ -363,15 +394,9 @@ remove_package() {
             fi
             echo -e "\n • '$pkg' marked for removal...\n"
             case "$reviewmode" in
-                "Review Changes")
-                    paru -R "$pkg"
-                    ;;
-                "Skip Review" | "Only Show Progress")
-                    paru -R --noconfirm "$pkg"
-                    ;;
-                *)
-                    paru -R "$pkg"
-                    ;;
+                "Review Changes") $aurtool -R "$pkg" ;;
+                "Skip Review" | "Only Show Progress") $aurtool -R --noconfirm "$pkg" ;;
+                *) $aurtool -R "$pkg" ;;
             esac
             if [[ $? -eq 0 ]]; then
                 grep -Fxv "$pkg" "$packagelist" > "${packagelist}.tmp" && mv "${packagelist}.tmp" "$packagelist"
@@ -385,15 +410,9 @@ remove_package() {
         pkg="$selection"
         echo -e "\n • '$pkg' marked for removal...\n"
         case "$reviewmode" in
-            "Review Changes")
-                paru -R "$pkg"
-                ;;
-            "Skip Review" | "Only Show Progress")
-                paru -R --noconfirm "$pkg"
-                ;;
-            *)
-                paru -R "$pkg"
-                ;;
+            "Review Changes") $aurtool -R "$pkg" ;;
+            "Skip Review" | "Only Show Progress") $aurtool -R --noconfirm "$pkg" ;;
+            *) $aurtool -R "$pkg" ;;
         esac
         if [[ $? -eq 0 ]]; then
             grep -Fxv "$pkg" "$packagelist" > "${packagelist}.tmp" && mv "${packagelist}.tmp" "$packagelist"
@@ -428,15 +447,9 @@ purge_package() {
             fi
             echo -e "\n • '$pkg' marked for removal...\n"
             case "$reviewmode" in
-                "Review Changes")
-                    paru -Rns "$pkg"
-                    ;;
-                "Skip Review" | "Only Show Progress")
-                    paru -Rns --noconfirm "$pkg"
-                    ;;
-                *)
-                    paru -Rns "$pkg"
-                    ;;
+                "Review Changes") $aurtool -Rns "$pkg" ;;
+                "Skip Review" | "Only Show Progress") $aurtool -Rns --noconfirm "$pkg" ;;
+                *) $aurtool -Rns "$pkg" ;;
             esac
             if [[ $? -eq 0 ]]; then
                 grep -Fxv "$pkg" "$packagelist" > "${packagelist}.tmp" && mv "${packagelist}.tmp" "$packagelist"
@@ -446,19 +459,14 @@ purge_package() {
             fi
         done
         read -rp " • Press Enter to continue..."
+
     elif [[ -n "$selection" ]]; then
         pkg="$selection"
         echo -e "\n • '$pkg' marked for removal...\n"
         case "$reviewmode" in
-            "Review Changes")
-                paru -Rns "$pkg"
-                ;;
-            "Skip Review" | "Only Show Progress")
-                paru -Rns --noconfirm "$pkg"
-                ;;
-            *)
-                paru -Rns "$pkg"
-                ;;
+            "Review Changes") $aurtool -Rns "$pkg" ;;
+            "Skip Review" | "Only Show Progress") $aurtool -Rns --noconfirm "$pkg" ;;
+            *) $aurtool -Rns "$pkg" ;;
         esac
         if [[ $? -eq 0 ]]; then
             grep -Fxv "$pkg" "$packagelist" > "${packagelist}.tmp" && mv "${packagelist}.tmp" "$packagelist"
@@ -473,6 +481,60 @@ purge_package() {
         sleep 1
     fi
 }
+
+rebuild_package() {
+    typed_input=""
+    pkg_to_rebuild=$(fzf --print-query \
+        --preview='pacman -Qil {}' \
+        --layout=reverse \
+        --prompt="Paruse › " \
+        --header="ESC to exit. Dbl-click or Enter package(s) to rebuild." \
+        --preview-window=wrap:50% \
+        < "$packagelist")
+    typed_input=$(echo "$pkg_to_rebuild" | head -n1)
+    selection=$(echo "$pkg_to_rebuild" | sed -n '2p')
+    # Typing multiple packages detected by space inputs, they also take precedent
+    if [[ "$typed_input" == *" "* ]]; then
+        for pkg in $typed_input; do
+            if ! grep -Fxq "$pkg" "$packagelist"; then
+                echo -e "\n • Huh? You typed ('$pkg') but it's not in your installed list...\n"; sleep 2
+                continue
+            fi
+            echo -e "\n • '$pkg' mark for rebuilding...\n"
+            case "$reviewmode" in
+                "Review Changes") $aurtool -S $(rebuild) "$pkg" ;;
+                "Skip Review" | "Only Show Progress") $aurtool -S $(rebuild) --noconfirm "$pkg" ;;
+                *) $aurtool -S $(rebuild) "$pkg" ;;
+            esac
+            if [[ $? -eq 0 ]]; then
+                echo -e "\n • Package '$pkg' has been rebuilt (cleanbuild)."
+            else
+                echo -e "\n • Package rebuild failed or canceled for '$pkg'."
+            fi
+        done
+        read -rp " • Press Enter to continue..."
+
+    elif [[ -n "$selection" ]]; then
+        pkg="$selection"
+        echo -e "\n • '$pkg' marked for rebuild...\n"
+        case "$reviewmode" in
+            "Review Changes") $aurtool -S $(rebuild) "$pkg" ;;
+            "Skip Review" | "Only Show Progress") $aurtool -S $(rebuild) --noconfirm "$pkg" ;;
+            *) $aurtool -S $(rebuild) "$pkg" ;;
+        esac
+        if [[ $? -eq 0 ]]; then
+            echo -e "\n • Package '$pkg' has been rebuilt (cleanbuild)."
+            read -rp " • Press Enter to continue..."
+        else
+            echo -e "\n • Package rebuild failed or canceled for '$pkg'."
+            read -rp " • Press Enter to continue..."
+        fi
+    else
+        echo -e "\n • No package selected."
+        sleep 1
+    fi    
+}
+
 install_list() {
     clear
     local packagelists preview_text choice selected_file
@@ -509,18 +571,10 @@ EOF
     echo -e "\n • Installing packages from: $packagelist\n"
 
     case "$reviewmode" in
-        "Review Changes")
-            paru -S --needed $(cat "$packagelist")
-            ;;
-        "Skip Review")
-            paru -S --needed --skipreview --noconfirm $(cat "$packagelist")
-            ;;
-        "Only Show Progress")
-            paru -S --needed --quiet --noconfirm --skipreview $(cat "$packagelist")
-            ;;
-        *)
-            paru -S --needed $(cat "$packagelist")
-            ;;
+        "Review Changes") $aurtool -S --needed $(cat "$packagelist") ;;
+        "Skip Review") $aurtool -S --needed $(skipreview) --noconfirm $(cat "$packagelist") ;;
+        "Only Show Progress") $aurtool -S --needed $(quiet) --noconfirm $(skipreview) $(cat "$packagelist") ;;
+        *) $aurtool -S --needed $(cat "$packagelist") ;;
     esac
     echo
     read -rp " • Press Enter to continue..."
@@ -535,17 +589,17 @@ backup_package_list() {
 fetch_news() {
     clear
     echo -e "\n${blueish} • Server Status:${nocolor} https://status.archlinux.org/\n"
-    if ! ping -c 1 -W 2 archlinux.org >/dev/null 2>&1; then
-        echo "[Skipped 3s] 🟠 Arch might be down.."
-    else
-        echo "[Operating]  🟢 Arch seems operational.."
+
+    if ! ping -c 1 -W 2 archlinux.org >/dev/null 2>&1; then echo "[Skipped 3s] 🟠 Arch might be down.."
+    else echo "[Operating]  🟢 Arch seems operational.."
     fi
-    if ! ping -c 1 -W 2 aur.archlinux.org >/dev/null 2>&1; then
-        echo "[Skipped 3s] 🟠 AUR might be down.."
-    else
-        echo "[Operating]  🟢 AUR seems operational.."
+
+    if ! ping -c 1 -W 2 aur.archlinux.org >/dev/null 2>&1; then echo "[Skipped 3s] 🟠 AUR might be down.."
+    else echo "[Operating]  🟢 AUR seems operational.."
     fi
+
     echo -e "\n${blueish} • News:${nocolor} https://www.phoronix.com/linux/Arch+Linux\n"
+
     curl -s https://www.phoronix.com/linux/Arch+Linux \
     | awk '
     function pad2(n) { return (n < 10 ? "0" n : n) }
@@ -572,15 +626,17 @@ fetch_news() {
         }
     }
     ' | head -n 4 | tac
+
     echo -e "\n${blueish} • News:${nocolor} https://archlinux.org/feeds/news/\n"
-    if ! output=$(timeout 3 paru -Pw 2>/dev/null); then
-        echo "[Skipped 3s] 🟠 Arch might be down.."
-    else
-        echo "$output"
+
+    if ! output=$(timeout 4 paru -Pw 2>/dev/null); then echo "[Skipped 3s] 🟠 Arch might be down.."
+    else echo "$output"
     fi
+    
     echo
     read -rp " • Press Enter to continue..."
 }
+
 sync_package_list() {
     if [[ ! -s "$packagelist" ]]; then
         echo -e "\n • packagelist is empty or missing. Populating with installed packages..."
@@ -588,9 +644,10 @@ sync_package_list() {
         echo -e "\n • packagelist exists. Syncing installed packages..."
         rm -f "$packagelist"
     fi
-    paru -Qqe | sort > "$packagelist"
+    $aurtool -Qqe | sort > "$packagelist"
     sleep 2
 }
+
 view_install_history() {
     RESET='\033[0m'
     grep -h '^\[.*\] \[ALPM\] \(installed\|removed\) ' /var/log/pacman.log* 2>/dev/null | \
@@ -621,11 +678,12 @@ if [[ -n "$1" ]]; then
         -a|-add) add_package;;
         -r|-rem) remove_package;;
         -p|-purge) purge_package;;
+       -re|-rebuild) rebuild_package;;
         -u|-up) paru -Syu; read -rp " • Press Enter to continue...";;
         -d|-data) paru -Ps; read -rp " • Press Enter to continue...";;
         -c|-cache) paru -Scc; read -rp " • Press Enter to continue...";;
         -s|-sync) sync_package_list;;
-        -rs|-restore) install_list;;
+       -rs|-restore) install_list;;
         -b|-backup) backup_package_list;;
         -n|-news) fetch_news;;
         -i|-history) view_install_history;;
@@ -642,12 +700,13 @@ Or any of these other options listed below.
   -a  -add      → Add/browse packages
   -r  -rem      → Remove package
   -p  -purge    → Purge package
+ -re  -rebuild  → Rebuild package
   -i  -history  → View install and uninstall history
   -u  -up       → Update system
   -d  -data     → Total package data briefing
   -c  -cache    → Clean cache
   -s  -sync     → Sync package list
-  -rs -restore  → Restore from backup
+ -rs  -restore  → Restore from backup
   -b  -backup   → Backup package list
   -n  -news     → Fetch Arch news
 
@@ -656,7 +715,7 @@ Have an issue? Please report it to the github: https://github.com/soulhotel/paru
 EOF
             exit 0
             ;;
-        *) echo "Unknown flag: $1"; exit 1 ;;
+        *) echo "Unknown flag, try typing: paruse --help"; exit 1 ;;
     esac
 fi
 
